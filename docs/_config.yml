@@ -4,3 +4,12 @@ exclude:
   - README.md
   - CNAME
 
+base_favicon: /assets/logos/LWV-AA_favicon.png
+sponsor_logo: /assets/logos/LWV-AA_logo.png
+sponsor_url: https://lwvaustin.org/
+sponsor_name: League of Women Voters Austin Area
+sponsor_name_short: LWV-AA
+maintainer_url: https://www.open-austin.org/
+maintainer_name: OpenAustin
+repo_url: https://github.com/open-austin/voter-registration-lookup-tool
+

@@ -1,13 +1,99 @@
 ---
 layout: base
-title: TODO
+title: Voter Registration Lookup Tool - LWV-AA
 ---
+<style>
+    label.form-label {
+        font-size: 120%;
+    }
+    #logo {
+        width: 100%;
+        max-width: 430px;
+    }
+</style>
 <div class="container">
+
+    <!-- Header -->
     <div class="row">
-        <div class="col">
-            <h1>
-                Hello World!
-            </h1>
+        <div class="col text-center">
+            <div class="mt-4">
+                <a
+                    href="{{ site.sponsor_url }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="d-inline-block"
+                ><img
+                    id="logo"
+                    src="{{ site.sponsor_logo | relative_url }}"
+                ></a>
+            </div>
+            <h2 class="mt-2">
+                Voter Registration Lookup Tool
+            </h2>
         </div>
     </div>
+
+    <!-- Progress tracker -->
+    <div class="row">
+        <div class="col text-center">
+            <h4 class="mt-4">
+                Step 1: Find your county
+            </h4>
+        </div>
+    </div>
+
+    <!-- Inputs -->
+    <div class="row mt-4">
+        <div class="col-sm-10 offset-sm-1 col-md-8 offset-md-2 col-lg-6 offset-lg-3">
+            <form>
+                <div class="mb-3">
+                    <label for="address" class="form-label">
+                        Find your county from your
+                        <span class="d-inline-block">home address:</span>
+                    </label>
+                    <input
+                        class="form-control form-control-lg"
+                        id="address"
+                        aria-describedby="address-help"
+                        placeholder="(e.g. 123 Main St...)"
+                    >
+                    <div id="address-help" class="form-text visually-hidden">This is your home address.</div>
+                </div>
+                <div class="mb-3">
+                    <button
+                        type="submit"
+                        class="btn btn-primary btn-lg"
+                    >Find my county</button>
+                </div>
+                <div class="mb-3">
+                    Already know your county?
+                    <a
+                        class=""
+                        data-bs-toggle="collapse"
+                        href="#county-dropdown-wrapper"
+                        role="button"
+                        aria-expanded="false"
+                        aria-controls="county-dropdown-wrapper"
+                    >Select it from a list</a>
+                </div>
+                <div class="collapse" id="county-dropdown-wrapper">
+                    <div class="row">
+                        <div class="col-md-10 offset-md-1">
+                            <div class="ms-2 mb-3">
+                                State: TX
+                            </div>
+                            <div>
+                                <select class="form-select" aria-label="Select your county">
+                                    <option selected>Select your county:</option>
+                                    <option value="TRAVIS">Travis</option>
+                                    <option value="WILLIAMSON">Williamson</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
 </div>

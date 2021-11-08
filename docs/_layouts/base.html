@@ -4,9 +4,9 @@
         <meta charset="utf-8">
         <meta name="robots" content="noindex, nofollow"/> <!-- Hidden from search engines while in beta -->
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="description" content="TODO">
-        <link rel="canonical-TODO" href="TODO" />
-        <link rel="icon" type="image/png" href="{{ '/assets/TODO.png' | relative_url }}">
+        <meta name="description" content="Look up your voter registration status and details! Brought to you by the {{ site.sponsor_name }}.">
+        <link rel="canonical" href="https://voterlookup.ballotapi.org/" />
+        <link rel="icon" type="image/png" href="{{ site.base_favicon | relative_url }}">
         <title>{{ page.title }}</title>
         <link href="{{ '/assets/bootstrap-5.1.3-dist/css/bootstrap.min.css' | relative_url }}" rel="stylesheet">
         <style>
@@ -30,8 +30,6 @@
         <!-- SVG Icons (see comment in css above on how to use) -->
         <svg id="svgicon-defs" xmlns="http://www.w3.org/2000/svg">
             <defs>
-                {% include fontawesome/fa-external-link.svg %}
-                {% include fontawesome/fa-link.svg %}
                 {% assign additional_svgicons = page.svgicons | split: ',' %}
                 {% for svgicon_name in additional_svgicons %}
                     {% assign svgicon_file = svgicon_name | strip | prepend: "fontawesome/" | append: ".svg" %}
@@ -43,6 +41,34 @@
         <!-- Content -->
         <div role="main">
             {{ content }}
+        </div>
+
+        <!-- Footer -->
+        <div class="row mt-5">
+            <div class="col text-center text-muted small mt-5">
+                This website was made by
+                <a
+                    href="{{ site.sponsor_url }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="d-inline-block text-muted"
+                >{{ site.sponsor_name_short }}</a>
+                and
+                <a
+                    href="{{ site.maintainer_url }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="d-inline-block text-muted"
+                >{{ site.maintainer_name }}</a>.
+                See our
+                <a
+                    href="{{ site.repo_url }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="d-inline-block text-muted"
+                >project page</a>
+                for more info.
+            </div>
         </div>
 
         <!-- Scripts -->
