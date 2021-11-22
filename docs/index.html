@@ -376,8 +376,10 @@ title: Voter Registration Lookup Tool - LWV-AA
         // reset searching text
         addressResults.querySelector(".searching").classList.remove("text-danger");
         addressResults.querySelector(".searching").innerText = _translate("Searching...");
-
         curSearchVal = searchTerm;
+
+        // reset the hidden address county result since we're changing the input
+        addressCounty.value = "";
 
         // always show the dropdown when searching
         const autocompleteDropdown = bootstrap.Dropdown.getOrCreateInstance(dropdownToggle, dropdownConfig);
@@ -583,10 +585,12 @@ title: Voter Registration Lookup Tool - LWV-AA
             return;
         }
 
-        // search the address in the input if no found county yet
-        //////////TODO
+        // no county found by autocomplete, so try searching directly from the input
+        if (addressCounty.value === "") {
+            //////////TODO
+        }
 
-        // no found county, so show an error
+        // still no county found, so show an error
         if (addressCounty.value === "") {
             addressError.textContent = _translate("We couldn't find a county from this address.");
             addressInput.classList.add("is-invalid");
@@ -595,8 +599,9 @@ title: Voter Registration Lookup Tool - LWV-AA
         }
 
         ////////////////TODO: render next step
+        addressError.textContent = `Success! DEBUG RESULT: ${addressCounty.value}`;
+        addressInput.classList.add("is-invalid");
         resetSubmit();
-        console.log("submit1!!!!!!!", addressCounty.value);  // will be empty string if not a valid
     }
 
     // county was selected
@@ -621,8 +626,9 @@ title: Voter Registration Lookup Tool - LWV-AA
         }
 
         ////////////////TODO: render next step
+        countyError.textContent = `Success! DEBUG RESULT: ${countySelect.value}`;
+        countySelect.classList.add("is-invalid");
         resetSubmit();
-        console.log("submit2!!!!!!!", countySelect.value);  // will be empty string if not a valid
     }
 </script>
 
