@@ -11,6 +11,7 @@ title: Voter Registration Lookup Tool - LWV-AA
         max-width: 430px;
     }
 </style>
+
 <div class="container">
 
     <!-- Header -->
@@ -45,26 +46,55 @@ title: Voter Registration Lookup Tool - LWV-AA
     <!-- Inputs -->
     <div class="row mt-4">
         <div class="col-sm-10 offset-sm-1 col-md-8 offset-md-2 col-lg-6 offset-lg-3">
-            <form>
+            <form id="address-lookup-form">
                 <div class="mb-3">
                     <label for="address" class="form-label">
                         Find your county from your
                         <span class="d-inline-block">home address:</span>
                     </label>
+                    <input type="hidden" id="address-county" value="">
                     <input
                         class="form-control form-control-lg"
                         id="address"
                         aria-describedby="address-help"
                         placeholder="(e.g. 123 Main St...)"
                     >
+                    <div id="address-error" class="invalid-feedback"></div>
+                    <div class="dropdown">
+                        <button id="address-autocomplete" data-bs-toggle="dropdown" aria-expanded="false" class="visually-hidden">
+                            Address autocomplete dropdown<!-- hidden but still needed for bootstrap dropdown javascript -->
+                        </button>
+                        <ul id="address-results" class="dropdown-menu" aria-labelledby="address-autocomplete">
+                            <!--
+                            <li>
+                                <a
+                                    class="dropdown-item address-result"
+                                    href="#"
+                                    data-val="123 Main St..."
+                                    data-region="Texas"
+                                    data-district="Travis County"
+                                >123 Main St...</a>
+                            </li>
+                            ...
+                            <li class="mt-3">
+                                <h6
+                                    class="dropdown-header searching"
+                                >Searching</h6>
+                            </li>
+                            -->
+                        </ul>
+                    </div>
                     <div id="address-help" class="form-text visually-hidden">This is your home address.</div>
                 </div>
                 <div class="mb-3">
                     <button
+                        id="address-submit"
                         type="submit"
                         class="btn btn-primary btn-lg"
                     >Find my county</button>
                 </div>
+            </form>
+            <form id="county-lookup-form">
                 <div class="mb-3">
                     Already know your county?
                     <a
@@ -83,11 +113,27 @@ title: Voter Registration Lookup Tool - LWV-AA
                                 State: TX
                             </div>
                             <div>
-                                <select class="form-select" aria-label="Select your county">
-                                    <option selected>Select your county:</option>
-                                    <option value="TRAVIS">Travis</option>
-                                    <option value="WILLIAMSON">Williamson</option>
+                                <select id="county-select" class="form-select" aria-label="Select your county">
+                                    <option value="" selected>Select your county:</option>
+                                    <option value='{"state": "TX", "county": "TRAVIS"}'>Travis</option>
+                                    <option value='{"state": "TX", "county": "WILLIAMSON"}'>Williamson</option>
                                 </select>
+                                <div id="county-error" class="invalid-feedback"></div>
+                            </div>
+                            <div class="mt-2">
+                                <button
+                                    id="county-submit"
+                                    type="submit"
+                                    class="btn btn-primary"
+                                >Submit</button>
+                                <a
+                                    class="btn btn-link btn-sm"
+                                    data-bs-toggle="collapse"
+                                    href="#county-dropdown-wrapper"
+                                    role="button"
+                                    aria-expanded="false"
+                                    aria-controls="county-dropdown-wrapper"
+                                >Nevermind</a>
                             </div>
                         </div>
                     </div>
@@ -97,3 +143,487 @@ title: Voter Registration Lookup Tool - LWV-AA
     </div>
 
 </div>
+
+<script>
+    "use strict"
+
+    /*************/
+    /** Globals **/
+    /*************/
+
+    // form elements
+    const addressForm = document.querySelector("#address-lookup-form");
+    const addressCounty = document.querySelector("#address-county");
+    const addressInput = document.querySelector("#address");
+    const addressSubmit = document.querySelector("#address-submit");
+    const addressResults = document.querySelector("#address-results");
+    const addressError = document.querySelector("#address-error");
+
+    const countyForm = document.querySelector("#county-lookup-form");
+    const countySelect = document.querySelector("#county-select");
+    const countySubmit = document.querySelector("#county-submit");
+    const countyError = document.querySelector("#county-error");
+
+    /**************************************************/
+    /** Voter Registration Lookup Tool extension API **/
+    /**************************************************/
+
+    // exchange public keys with the extension to set up a secure shared key
+    let sharedKey = undefined;
+    (async () => {
+
+        // generate a keypair
+        const pageKey = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveKey"]);
+        const pagePubJwk = await crypto.subtle.exportKey("jwk", pageKey.publicKey);
+
+        // derive a shared key between the page and the content script
+        async function pageKeyExchange (extensionPubJwk) {
+            const extensionPubkey = await crypto.subtle.importKey("jwk", extensionPubJwk, { name: "ECDH", namedCurve: "P-256" }, false, []);
+            sharedKey = await crypto.subtle.deriveKey({ name: "ECDH", namedCurve: "P-256", public: extensionPubkey }, pageKey.privateKey, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+        }
+
+        // listen for broadcast of the extension's public key (trust on first use)
+        window.addEventListener("message", async (evt) => {
+            if (sharedKey === undefined && evt.ports.length === 0 && typeof evt.data === "object" && evt.data['extensionPubJwk']) {
+                pageKeyExchange(evt.data['extensionPubJwk']);
+            }
+        });
+
+        // let the extension know your public key
+        window.postMessage({ pagePubJwk: pagePubJwk }, "*");
+    })();
+
+
+    // promise-based extension messages
+    function sendMessageToExtension (action, data, timeout) {
+
+        // promise that will resolve when the message is returned
+        const msgPromise = new Promise(async (resolve, reject) => {
+
+            // create a dedicated message channel that will resolve when a response is returned
+            const channel = new MessageChannel();
+            channel.port1.onmessage = (responseMsg) => {
+                channel.port1.close();
+                resolve(responseMsg.data);
+            };
+
+            // build the encrypted payload with the extension's provided key
+            const payload = {
+                action: action,
+                data: data,
+            };
+            const payloadBytes = (new TextEncoder()).encode(JSON.stringify(payload));
+            const ivBytes = crypto.getRandomValues(new Uint8Array(12));
+            const iv64 = btoa(String.fromCharCode.apply(null, new Uint8Array(ivBytes)));
+            const encryptedBytes = await crypto.subtle.encrypt({ name: "AES-GCM", iv: ivBytes, tagLength: 128}, sharedKey, payloadBytes);
+            const encrypted64 = btoa(String.fromCharCode.apply(null, new Uint8Array(encryptedBytes)));
+
+            // post the encrypted message to the extension
+            const msg = {
+                iv: iv64,
+                encrypted: encrypted64,
+            };
+            window.postMessage(msg, "*", [channel.port2]);
+        });
+
+        // promise that will reject when timeout is reached
+        const timeoutPromise = new Promise((resolve, reject) => setTimeout(() => reject(new Error("Timeout")), timeout === undefined ? 5000 : timeout));
+
+        return Promise.race([msgPromise, timeoutPromise]);
+    }
+
+
+    ////////TODO remove these console debug functions
+    async function TODOdoMsg (action, data, timeout) {
+        const result = await sendMessageToExtension(action, data, timeout);
+        console.log("result!", result);
+    }
+
+
+    /**********/
+    /** Init **/
+    /**********/
+
+    // wait for bootstrap to load to init
+    const initTime = new Date();
+    function init () {
+
+        // wait for web extension to load
+        if (sharedKey === undefined) {
+
+            // give up after 1 second and show the "please install extention" error
+            if (((new Date()).getTime() - initTime.getTime()) > 1 * 1000) {
+                console.log("gave up waiting for extension to load"); ///////////TODO: show please install extenion error
+            }
+            // try again in 10 ms
+            else {
+                setTimeout(init, 10);
+                return;
+            }
+        }
+
+        // wait for bootstrap to load
+        if (window.bootstrap === undefined) {
+
+            // show error if timed out (5 minutes)
+            if (((new Date()).getTime() - initTime.getTime()) > 5 * 60 * 1000) {
+                addressError.textContent = _translate("Error: Bootstrap failed to load");
+                addressInput.classList.add("is-invalid");
+                return;
+            }
+
+            // try again in 50 ms
+            setTimeout(init, 50);
+            return;
+        }
+
+        // resources has loaded so activate the page
+
+        // reset the form
+        resetFeedback();
+        addressCounty.value = "";
+        countySelect.value = "";
+
+        // add needed listeners
+        document.body.addEventListener("click", bodyClick);
+        addressInput.addEventListener("keydown", keydownAddressInput);
+        addressInput.addEventListener("keyup", keyupAddressInput);
+        addressForm.addEventListener("submit", submitAddressForm);
+        countyForm.addEventListener("submit", submitCountyForm);
+    }
+    init();
+
+
+
+
+
+
+
+
+
+    // elements and configs
+    const dropdownToggle = document.querySelector("#address-autocomplete");
+    const dropdownConfig = { autoClose: false,  reference: addressInput };
+
+    // clicking anywhere outside of the dropdown or input closes the dropdown
+    async function bodyClick (clickEvent) {
+        const isInAutocomplete = addressInput.contains(event.target) || addressResults.contains(event.target);
+        if (!isInAutocomplete) {
+            const autocompleteDropdown = bootstrap.Dropdown.getOrCreateInstance(dropdownToggle, dropdownConfig);
+            autocompleteDropdown.hide();
+        }
+    }
+
+    // re-focus back on the input, since showing the dropdown focuses the dropdown toggle automatically
+    dropdownToggle.parentNode.addEventListener("shown.bs.dropdown", () => { addressInput.focus(); });
+
+    // input changes trigger to start searching
+    async function keydownAddressInput (keydownEvent) {
+
+        // remove any previous errors when the user starts editing again
+        addressInput.classList.remove("is-invalid");
+
+        // pressing down-arrow in the address lookup input selects the first option in dropdown (if present)
+        if(keydownEvent.which === 40){
+            let resultsList = addressResults.parentNode.querySelectorAll(".dropdown-menu.show .dropdown-item");
+            if (resultsList.length > 0) {
+                resultsList[0].focus();
+            }
+        }
+    }
+
+
+
+
+    // search state
+    let curSearch = undefined;
+    let curSearchVal = "";
+    let nextSearchVal = "";
+
+    // event to trigger when we want to try to do a new search
+    function kickoffSearch () {
+
+        // stop searching when search text is cleared
+        if (!nextSearchVal) {
+
+            // hide and reset the dropdown results
+            const autocompleteDropdown = bootstrap.Dropdown.getOrCreateInstance(dropdownToggle, dropdownConfig);
+            autocompleteDropdown.hide();
+            addressResults.innerHTML = "";
+
+            // clear rendering of any existing in-progress searches
+            curSearch = undefined;
+            curSearchVal = "";
+
+            return;
+        }
+
+        // search if there's no existing search in-progress
+        if (nextSearchVal !== curSearchVal && curSearch === undefined) {
+            curSearch = doSearch(nextSearchVal);
+        }
+    }
+
+    // the actual search
+    async function doSearch (searchTerm) {
+
+        // add a searching status to the dropdown
+        const searchingEl = _elementFromHTML(`<li class="mt-3"><h6 class="dropdown-header searching"></h6></li>`);
+        if (addressResults.querySelector(".searching") === null) {
+            addressResults.appendChild(searchingEl);
+        }
+
+        // reset searching text
+        addressResults.querySelector(".searching").classList.remove("text-danger");
+        addressResults.querySelector(".searching").innerText = _translate("Searching...");
+
+        curSearchVal = searchTerm;
+
+        // always show the dropdown when searching
+        const autocompleteDropdown = bootstrap.Dropdown.getOrCreateInstance(dropdownToggle, dropdownConfig);
+        autocompleteDropdown.show();
+
+        // search for results
+        let mapboxResponse = undefined;
+        const qVal = encodeURIComponent(nextSearchVal);
+        const qParams = (new URLSearchParams({
+            "access_token": "pk.eyJ1IjoiZHJvZXNsZXItbHd2YXVzdGluIiwiYSI6ImNrdm5za2o0bDBvMHYycG1uczZ5ejQxaWEifQ.JtdVoKL00OQLIBjzmGGcfw",
+            "autocomplete": true,
+            "proximity": "-97.743,30.267",
+            "country": "us",
+            "types": "address",
+        })).toString();
+        try {
+            mapboxResponse = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${qVal}.json?${qParams}`);
+        } catch (fetchErr) {
+            mapboxResponse = { status: -1, err: fetchErr };
+        }
+
+        // don't worry about showing results if the search was cancelled
+        if (curSearch === undefined) {
+            return;
+        }
+
+        // done searching, so clear things up for the next search
+        curSearch = undefined;
+
+        // errored results
+        if (mapboxResponse.status !== 200) {
+
+            // kick off searching again if there's a different search term
+            if (nextSearchVal && nextSearchVal !== curSearchVal) {
+                kickoffSearch();
+                return;
+            }
+
+            // otherwise, render an error
+            console.log("ERROR mapboxResponse", mapboxResponse);
+            addressResults.querySelector(".searching").classList.add("text-danger");
+            addressResults.querySelector(".searching").innerText = `${_translate("Error")}: ${_escapeHTML(mapboxResponse.status)}`;
+            return;
+        }
+
+        // mapboxJson = {
+        //  ...
+        //  "features": [
+        //      {
+        //          ...
+        //          "place_name": "1807 West 35th Street, Austin, Texas 78703, United States",
+        //          ...
+        //          "context": [
+        //              ...
+        //              {
+        //                  "id": "district.14251652747735210",
+        //                  "text": "Travis County",
+        //                  ...
+        //              },
+        //              ...
+        //          ],
+        //          ...
+        //      },
+        //      ...
+        //  ],
+        //  ...
+        // }
+        const mapboxJson = await mapboxResponse.json();
+
+        // clear any existing results
+        addressResults.querySelectorAll(".address-result").forEach((el) => { el.parentNode.remove() });
+
+        // no results
+        if (mapboxJson['features'].length === 0) {
+
+            // kick off searching again if there's a different search term
+            if (nextSearchVal && nextSearchVal !== curSearchVal) {
+                kickoffSearch();
+                return;
+            }
+
+            // otherwise, render the empty results
+            addressResults.querySelector(".searching").innerText = _translate("No matching addresses")
+            return;
+        }
+
+        // render the address results
+        for (let featureIndex = (mapboxJson['features'].length - 1); featureIndex >= 0; featureIndex--) {
+            const mapboxFeature = mapboxJson['features'][featureIndex];
+
+            // determine the county for the result
+            let regionName = undefined;     // i.e. state
+            let districtName = undefined;   // i.e. county
+            mapboxFeature['context'].forEach((mapboxContext) => {
+                if (mapboxContext['id'].indexOf("region.") === 0) { regionName = mapboxContext['text'] }
+                if (mapboxContext['id'].indexOf("district.") === 0) { districtName = mapboxContext['text'] }
+            });
+
+            // only add results that have a county
+            if (regionName && districtName) {
+
+                // the address result entry
+                let addressResult = _elementFromHTML(
+                    `<li>
+                        <a
+                            class="dropdown-item address-result"
+                            href="#"
+                            data-val="${_escapeHTML(mapboxFeature['place_name'])}"
+                            data-region="${_escapeHTML(regionName)}"
+                            data-district="${_escapeHTML(districtName)}"
+                        >${_escapeHTML(mapboxFeature['place_name'])}</a>
+                    </li>`
+                );
+
+                // clicking on the result will select and submit it
+                addressResult.querySelector("a.address-result").addEventListener("click", clickAddressOption);
+
+                // add result to the results dropdown
+                addressResults.prepend(addressResult);
+            }
+
+        }
+
+        // remove the searching since done showing results
+        addressResults.querySelector(".searching").parentNode.remove();
+
+    }
+
+    // input changes trigger to start searching
+    function keyupAddressInput (keyupEvent) {
+        nextSearchVal = addressInput.value.trim();
+        kickoffSearch();
+    }
+
+
+    // reset feedback state
+    function resetFeedback () {
+        addressError.textContent = "";
+        addressInput.classList.remove("is-invalid");
+        countyError.textContent = "";
+        countySelect.classList.remove("is-invalid");
+    }
+
+    // reset submitting state
+    function resetSubmit () {
+        addressSubmit.textContent = _translate("Find my county");
+        addressSubmit.classList.remove("disabled");
+        countySubmit.textContent = _translate("Submit");
+        countySubmit.classList.remove("disabled");
+    }
+
+    // selecting an address autocomplete result
+    const mapboxLocationMap = {
+        "Texas": {
+            "Travis County":        {"state": "TX", "county": "TRAVIS"},
+            "Williamson County":    {"state": "TX", "county": "WILLIAMSON"},
+        }
+    }
+    function clickAddressOption (clickEvent) {
+        clickEvent.preventDefault();
+
+        // set the input to match the selected result
+        resetFeedback();
+        addressInput.value = clickEvent.target.dataset.val;
+
+        // hide the dropdown
+        const autocompleteDropdown = bootstrap.Dropdown.getOrCreateInstance(dropdownToggle, dropdownConfig);
+        autocompleteDropdown.hide();
+
+        // submit if county is supported
+        let mapboxRegion = clickEvent.target.dataset.region;
+        let mapboxDistrict = clickEvent.target.dataset.district;
+        if (mapboxLocationMap[mapboxRegion] && mapboxLocationMap[mapboxRegion][mapboxDistrict]) {
+            addressCounty.value = JSON.stringify(mapboxLocationMap[mapboxRegion][mapboxDistrict]);
+            submitAddressForm();
+        }
+
+        // not a supported county, so show an error
+        else {
+            addressCounty.value = "";
+            addressError.textContent = `${_translate("Apologies. We currently don't support")} "${mapboxDistrict}, ${mapboxRegion}".`;
+            addressInput.classList.add("is-invalid");
+        }
+    }
+
+    async function submitAddressForm (submitEvent) {
+
+        // don't actually submit if triggered from clicking the submit button
+        if (submitEvent) {
+            submitEvent.preventDefault();
+        }
+
+        // submitting state
+        resetFeedback();
+        addressSubmit.textContent = _translate("Searching...");
+        addressSubmit.classList.add("disabled");
+
+        // no found county and search is empty, so show blank state error
+        if (addressCounty.value === "" && !addressInput.value.trim()) {
+            addressError.textContent = _translate("Please provide your address.");
+            addressInput.classList.add("is-invalid");
+            resetSubmit();
+            return;
+        }
+
+        // search the address in the input if no found county yet
+        //////////TODO
+
+        // no found county, so show an error
+        if (addressCounty.value === "") {
+            addressError.textContent = _translate("We couldn't find a county from this address.");
+            addressInput.classList.add("is-invalid");
+            resetSubmit();
+            return;
+        }
+
+        ////////////////TODO: render next step
+        resetSubmit();
+        console.log("submit1!!!!!!!", addressCounty.value);  // will be empty string if not a valid
+    }
+
+    // county was selected
+    async function submitCountyForm (submitEvent) {
+
+        // don't actually submit if triggered from clicking the submit button
+        if (submitEvent) {
+            submitEvent.preventDefault();
+        }
+
+        // submitting state
+        resetFeedback();
+        countySubmit.textContent = _translate("Submitting...");
+        countySubmit.classList.add("disabled");
+
+        // show a error if not a county in the dropdown
+        if (!countySelect.value) {
+            countyError.textContent = "Please select a county";
+            countySelect.classList.add("is-invalid");
+            resetSubmit();
+            return;
+        }
+
+        ////////////////TODO: render next step
+        resetSubmit();
+        console.log("submit2!!!!!!!", countySelect.value);  // will be empty string if not a valid
+    }
+</script>
+
+

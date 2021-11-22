@@ -1,0 +1,36 @@
+{
+    "manifest_version": 2,
+    "default_locale": "en",
+    "name": "__MSG_extensionName__",
+    "version": "1.0",
+    "background": {
+        "scripts": [
+            "/assets/browser-polyfill.min.js",
+            "/sdk/LWVAA.js",
+            "/background.js"
+        ]
+    },
+    "content_scripts": [
+        {
+            "run_at": "document_start",
+            "matches": [
+                "https://voterlookup.lwvaustin.org/",
+                "https://voterlookup.ballotapi.org/",
+                "http://localhost/"
+            ],
+            "js": [
+                "/assets/browser-polyfill.min.js",
+                "/content.js"
+            ]
+        }
+    ],
+    "browser_action": {
+        "default_title": "__MSG_extensionName__"
+    },
+    "permissions": [
+        "https://www.example.com/"
+    ],
+    "optional_permissions": [
+        "<all_urls>"
+    ]
+}
