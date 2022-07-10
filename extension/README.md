@@ -3,8 +3,8 @@
 This folder has the code for the Voter Registration Lookup Tool [web extension](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons), which needs to be installed to make [voterlookup.ballotapi.org](https://voterlookup.ballotapi.org/) work.
 
 There are two options for installing this extension:
-* [Option A](#TODO): Install from your browser's extension store
-* [Option B](#TODO): Install from your local development environment
+* [Option A](#option-a-install-from-your-browsers-extension-store): Install from your browser's extension store
+* [Option B](#option-b-install-from-your-local-development-environment): Install from your local development environment
 
 ## Option A: Install from your browser's extension store
 
