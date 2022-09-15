@@ -203,7 +203,38 @@
     /********************/
     /** Lookup Options **/
     /********************/
-    //TODO
+
+    // return a list of supported states
+    async function _getStates() {
+        let statesResult = [];
+        for (stateId in _stateRef) {
+            statesResult.push({
+                "stateId": _stateRef[stateId].stateId,
+                "stateName": _stateRef[stateId].stateName,
+            });
+        }
+        statesResult.sort((a, b) => { return a.stateName < b.stateName ? -1 : 1; });
+        return statesResult;
+    }
+
+    // return the properties of a specific state
+    async function _getState(stateId) {
+        let state = _stateRef[stateId];
+        stateResult = {
+            "stateId": state.stateId,
+            "stateName": state.stateName,
+            "lookupOptions": [],
+        };
+        for (lookupOption of state.lookupOptions) {
+            stateResult['lookupOptions'].push({
+                "lookupOptionId": lookupOption.lookupOptionId,
+                "name": lookupOption.name,
+                "sources": lookupOption.sources,
+                "params": lookupOption.params,
+            });
+        }
+        return state;
+    }
 
 
     /********************/
@@ -212,8 +243,8 @@
     root.LWVAA = {
         setMapboxToken: _setMapboxToken,
         searchAddress: _searchAddress,
-        //getState: _getState,
-        //getStates: _getStates,
+        getState: _getState,
+        getStates: _getStates,
         //getCounty: _getCounty,
         //getCounties: _getCounties,
         //lookupVoter: _lookupVoter,

@@ -122,6 +122,7 @@ Load the state details and voter lookup options for a specific state.
     "lookupOptions": [
         {
             "lookupOptionId": "<lookupOptionId>",
+            "name": "<str>",
             "sources": ["<lookupSource>", ...],
             "params": {"<paramKey>": "<isRequired>", ...},
         },
@@ -159,6 +160,7 @@ console.log(state);
     "lookupOptions": [
         {
             "lookupOptionId": "l_tx_nameandbday",
+            "name": "Name, Birthday, and Zipcode",
             "sources": ["stateWebsite"],
             "params": {
                 "firstName": "required",
@@ -168,25 +170,24 @@ console.log(state);
                 "countyId": "required",
                 "zipCode": "required",
             },
-            "countyIds": ["*"],
         },
         {
             "lookupOptionId": "l_tx_dlicense",
+            "name": "Drivers License and Birthday",
             "sources": ["stateWebsite"],
             "params": {
                 "driversLicense": "required",
                 "birthDate": "required",
             },
-            "countyIds": ["*"],
         },
         {
             "lookupOptionId": "l_tx_vuid",
+            "name": "VUID and Birthday",
             "sources": ["stateWebsite"],
             "params": {
                 "vuid": "required",
                 "birthDate": "required",
             },
-            "countyIds": ["*"],
         },
     ],
 }
